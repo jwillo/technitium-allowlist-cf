@@ -1,5 +1,6 @@
 const DEFAULT_OBJECT_KEY = "allowlist.txt";
 const ABP_HEADER = "[Adblock Plus 2.0]";
+const DEFAULT_SEED_DOMAIN = "jdcf.cc";
 
 export default {
   async fetch(request, env) {
@@ -62,13 +63,26 @@ async function addDomain(request, env) {
 
 async function loadAllowlist(env) {
   const text = await loadAllowlistRaw(env);
-  return parseAllowlistDomains(text);
+  const domains = parseAllowlistDomains(text);
+
+  if (!domains.length) {
+    const seeded = [DEFAULT_SEED_DOMAIN];
+    await saveAllowlist(env, seeded);
+    return seeded;
+  }
+
+  return domains;
 }
 
 async function loadAllowlistRaw(env) {
   const object = await env.ALLOWLIST_BUCKET.get(getObjectKey(env));
   if (!object) {
-    return buildAbpAllowlist([]);
+    const seeded = [DEFAULT_SEED_DOMAIN];
+    const body = buildAbpAllowlist(seeded);
+    await env.ALLOWLIST_BUCKET.put(getObjectKey(env), body, {
+      httpMetadata: { contentType: "text/plain; charset=utf-8" },
+    });
+    return body;
   }
 
   return await object.text();
@@ -262,6 +276,13 @@ function buildUiHtml() {
       .url {
         font-family: "IBM Plex Mono", monospace;
         font-size: 0.88rem;
+        display: block;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: rgba(0, 0, 0, 0.24);
+        padding: 0.74rem 0.8rem;
+        color: var(--text);
+        overflow-wrap: anywhere;
       }
 
       #status {
@@ -306,7 +327,7 @@ function buildUiHtml() {
       <div class="url-box">
         <label for="allowlist-url">Allowlist URL to use in Technitium</label>
         <div class="url-row">
-          <input id="allowlist-url" class="url" readonly />
+          <div id="allowlist-url" class="url"></div>
           <button id="copy-url-btn" class="ghost" type="button">Copy URL</button>
         </div>
       </div>
@@ -324,12 +345,13 @@ function buildUiHtml() {
       const input = document.getElementById("domain");
       const addBtn = document.getElementById("add-domain-btn");
       const showBtn = document.getElementById("show-domains-btn");
-      const urlInput = document.getElementById("allowlist-url");
+      const urlEl = document.getElementById("allowlist-url");
       const copyUrlBtn = document.getElementById("copy-url-btn");
       const list = document.getElementById("list");
       const statusEl = document.getElementById("status");
 
-      urlInput.value = window.location.origin + "/allowlist.txt";
+      const allowlistUrl = window.location.origin + "/allowlist.txt";
+      urlEl.textContent = allowlistUrl;
 
       function setStatus(msg, type = "") {
         statusEl.textContent = msg;
@@ -348,6 +370,10 @@ function buildUiHtml() {
 
       async function loadDomains() {
         const res = await fetch("/api/domains");
+        if (!res.ok) {
+          setStatus("Unable to fetch allowlist.", "error");
+          return;
+        }
         const data = await res.json();
         renderDomains(data.domains || []);
         setStatus("Loaded " + (data.domains?.length || 0) + " domains.", "");
@@ -397,10 +423,10 @@ function buildUiHtml() {
 
       copyUrlBtn.addEventListener("click", async () => {
         try {
-          await navigator.clipboard.writeText(urlInput.value);
+          await navigator.clipboard.writeText(allowlistUrl);
           setStatus("Allowlist URL copied", "ok");
         } catch {
-          setStatus("Copy failed. You can copy from the URL field.", "error");
+          setStatus("Copy failed. You can copy from the URL shown above.", "error");
         }
       });
 
