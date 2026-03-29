@@ -295,7 +295,7 @@ function buildUiHtml() {
           return;
         }
         list.innerHTML = domains
-          .map((domain, i) => `<div class="row"><span>${domain}</span><span>#${i + 1}</span></div>`)
+          .map((domain, i) => "<div class=\"row\"><span>" + domain + "</span><span>#" + (i + 1) + "</span></div>")
           .join("");
       }
 
@@ -303,7 +303,7 @@ function buildUiHtml() {
         const res = await fetch("/api/domains");
         const data = await res.json();
         renderDomains(data.domains || []);
-        setStatus(`Loaded ${data.domains?.length || 0} domains.`, "");
+        setStatus("Loaded " + (data.domains?.length || 0) + " domains.", "");
       }
 
       form.addEventListener("submit", async (event) => {
@@ -327,7 +327,7 @@ function buildUiHtml() {
         }
 
         input.value = "";
-        setStatus(`Added ${data.domain}`, "ok");
+        setStatus("Added " + data.domain, "ok");
         await loadDomains();
       });
 

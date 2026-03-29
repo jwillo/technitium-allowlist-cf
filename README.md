@@ -18,6 +18,7 @@ Create and fill `.env` in the project root:
 
 ```dotenv
 CLOUDFLARE_API_TOKEN=your_token_here
+CLOUDFLARE_ACCOUNT_ID=your_account_id_here
 ```
 
 Then load it in your shell before running Wrangler:
