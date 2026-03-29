@@ -417,7 +417,7 @@ function buildUiHtml() {
           return;
         }
         const rows = domains
-          .map((domain, i) => "<tr><td>#" + (i + 1) + "</td><td>" + domain + "</td><td class=\"action-cell\"><button class=\"delete-btn\" data-domain=\"" + domain + "\" type=\"button\">Delete</button></td></tr>")
+          .map((domain, i) => '<tr><td>#' + (i + 1) + '</td><td>' + domain + '</td><td class="action-cell"><button class="delete-btn" data-domain="' + domain + '" type="button">Delete</button></td></tr>')
           .join("");
         list.innerHTML = "<table><thead><tr><th>#</th><th>Domain</th><th>Action</th></tr></thead><tbody>" + rows + "</tbody></table>";
       }
