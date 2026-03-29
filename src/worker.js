@@ -203,9 +203,9 @@ function buildUiHtml() {
         color: var(--muted);
       }
 
-      form {
+      .controls {
         display: grid;
-        grid-template-columns: 1fr auto;
+        grid-template-columns: 1fr auto auto;
         gap: 0.75rem;
         margin-bottom: 1rem;
       }
@@ -230,6 +230,38 @@ function buildUiHtml() {
         color: #032f1f;
         background: linear-gradient(135deg, var(--accent), var(--accent-2));
         cursor: pointer;
+      }
+
+      .ghost {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.14);
+        border: 1px solid rgba(255, 255, 255, 0.24);
+      }
+
+      .url-box {
+        margin-bottom: 0.8rem;
+        padding: 0.7rem;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: rgba(0, 0, 0, 0.2);
+      }
+
+      .url-box label {
+        display: block;
+        color: var(--muted);
+        margin-bottom: 0.4rem;
+        font-size: 0.9rem;
+      }
+
+      .url-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.6rem;
+      }
+
+      .url {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.88rem;
       }
 
       #status {
@@ -262,7 +294,8 @@ function buildUiHtml() {
       .empty { padding: 0.9rem; color: var(--muted); }
 
       @media (max-width: 640px) {
-        form { grid-template-columns: 1fr; }
+        .controls { grid-template-columns: 1fr; }
+        .url-row { grid-template-columns: 1fr; }
       }
     </style>
   </head>
@@ -270,19 +303,33 @@ function buildUiHtml() {
     <main class="panel">
       <h1>Technitium DNS Allowlist</h1>
       <p class="meta">Backed by R2 object <code>/allowlist.txt</code> in Adblock Plus format using exception rules like <code>@@||example.com^</code>.</p>
-      <form id="add-form">
-        <input id="domain" name="domain" placeholder="example.com or *.trusted.org" required />
-        <button type="submit">Add Domain</button>
-      </form>
+      <div class="url-box">
+        <label for="allowlist-url">Allowlist URL to use in Technitium</label>
+        <div class="url-row">
+          <input id="allowlist-url" class="url" readonly />
+          <button id="copy-url-btn" class="ghost" type="button">Copy URL</button>
+        </div>
+      </div>
+
+      <div class="controls">
+        <input id="domain" name="domain" placeholder="example.com or *.trusted.org" />
+        <button id="add-domain-btn" type="button">Add New</button>
+        <button id="show-domains-btn" class="ghost" type="button">Show Existing</button>
+      </div>
       <div id="status"></div>
       <section class="list" id="list"></section>
     </main>
 
     <script>
-      const form = document.getElementById("add-form");
       const input = document.getElementById("domain");
+      const addBtn = document.getElementById("add-domain-btn");
+      const showBtn = document.getElementById("show-domains-btn");
+      const urlInput = document.getElementById("allowlist-url");
+      const copyUrlBtn = document.getElementById("copy-url-btn");
       const list = document.getElementById("list");
       const statusEl = document.getElementById("status");
+
+      urlInput.value = window.location.origin + "/allowlist.txt";
 
       function setStatus(msg, type = "") {
         statusEl.textContent = msg;
@@ -306,10 +353,12 @@ function buildUiHtml() {
         setStatus("Loaded " + (data.domains?.length || 0) + " domains.", "");
       }
 
-      form.addEventListener("submit", async (event) => {
-        event.preventDefault();
+      async function addDomain() {
         const domain = input.value.trim();
-        if (!domain) return;
+        if (!domain) {
+          setStatus("Enter a domain first.", "error");
+          return;
+        }
 
         setStatus("Adding domain...", "");
 
@@ -329,6 +378,30 @@ function buildUiHtml() {
         input.value = "";
         setStatus("Added " + data.domain, "ok");
         await loadDomains();
+      }
+
+      addBtn.addEventListener("click", () => {
+        addDomain().catch(() => setStatus("Failed to add domain", "error"));
+      });
+
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          addDomain().catch(() => setStatus("Failed to add domain", "error"));
+        }
+      });
+
+      showBtn.addEventListener("click", () => {
+        loadDomains().catch(() => setStatus("Failed to load allowlist", "error"));
+      });
+
+      copyUrlBtn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(urlInput.value);
+          setStatus("Allowlist URL copied", "ok");
+        } catch {
+          setStatus("Copy failed. You can copy from the URL field.", "error");
+        }
       });
 
       loadDomains().catch(() => setStatus("Failed to load allowlist", "error"));
