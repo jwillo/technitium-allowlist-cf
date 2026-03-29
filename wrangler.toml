@@ -1,0 +1,10 @@
+name = "technitium-allowlist"
+main = "src/worker.js"
+compatibility_date = "2026-03-29"
+
+[vars]
+ALLOWLIST_OBJECT_KEY = "allowlist.txt"
+
+[[r2_buckets]]
+binding = "ALLOWLIST_BUCKET"
+bucket_name = "technitium-allowlist"
