@@ -21,6 +21,10 @@ export default {
       return addDomain(request, env);
     }
 
+    if (request.method === "DELETE" && url.pathname === "/api/domains") {
+      return deleteDomain(request, env);
+    }
+
     if (request.method === "GET" && url.pathname === "/allowlist.txt") {
       const body = await loadAllowlistRaw(env);
       return new Response(body, {
@@ -59,6 +63,32 @@ async function addDomain(request, env) {
   await saveAllowlist(env, updated);
 
   return json({ ok: true, domain: normalized, total: updated.length }, 201);
+}
+
+async function deleteDomain(request, env) {
+  let payload;
+  try {
+    payload = await request.json();
+  } catch {
+    return json({ error: "Body must be valid JSON" }, 400);
+  }
+
+  const candidate = typeof payload?.domain === "string" ? payload.domain.trim() : "";
+  const normalized = normalizeDomain(candidate);
+
+  if (!normalized) {
+    return json({ error: "Invalid domain format" }, 400);
+  }
+
+  const domains = await loadAllowlist(env);
+  if (!domains.includes(normalized)) {
+    return json({ error: "Domain not found", domain: normalized }, 404);
+  }
+
+  const updated = domains.filter((domain) => domain !== normalized);
+  await saveAllowlist(env, updated);
+
+  return json({ ok: true, domain: normalized, total: updated.length });
 }
 
 async function loadAllowlist(env) {
@@ -302,16 +332,39 @@ function buildUiHtml() {
         overflow: auto;
       }
 
-      .row {
-        display: flex;
-        justify-content: space-between;
-        padding: 0.72rem 0.9rem;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      table {
+        width: 100%;
+        border-collapse: collapse;
         font-family: "IBM Plex Mono", monospace;
-        font-size: 0.92rem;
+        font-size: 0.9rem;
       }
 
-      .row:last-child { border-bottom: 0; }
+      th, td {
+        text-align: left;
+        padding: 0.72rem 0.9rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      th {
+        color: var(--muted);
+        font-weight: 500;
+        position: sticky;
+        top: 0;
+        background: rgba(15, 23, 28, 0.95);
+      }
+
+      .action-cell { width: 120px; }
+
+      .delete-btn {
+        border: 1px solid rgba(255, 137, 107, 0.45);
+        color: #ffd2c6;
+        background: rgba(255, 137, 107, 0.15);
+        padding: 0.45rem 0.7rem;
+        border-radius: 8px;
+        font-weight: 600;
+      }
+
+      tr:last-child td { border-bottom: 0; }
       .empty { padding: 0.9rem; color: var(--muted); }
 
       @media (max-width: 640px) {
@@ -363,9 +416,10 @@ function buildUiHtml() {
           list.innerHTML = '<div class="empty">No domains yet.</div>';
           return;
         }
-        list.innerHTML = domains
-          .map((domain, i) => "<div class=\"row\"><span>" + domain + "</span><span>#" + (i + 1) + "</span></div>")
+        const rows = domains
+          .map((domain, i) => "<tr><td>#" + (i + 1) + "</td><td>" + domain + "</td><td class=\"action-cell\"><button class=\"delete-btn\" data-domain=\"" + domain + "\" type=\"button\">Delete</button></td></tr>")
           .join("");
+        list.innerHTML = "<table><thead><tr><th>#</th><th>Domain</th><th>Action</th></tr></thead><tbody>" + rows + "</tbody></table>";
       }
 
       async function loadDomains() {
@@ -406,6 +460,26 @@ function buildUiHtml() {
         await loadDomains();
       }
 
+      async function deleteDomain(domain) {
+        setStatus("Deleting " + domain + "...", "");
+
+        const res = await fetch("/api/domains", {
+          method: "DELETE",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ domain }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          setStatus(data.error || "Unable to delete domain", "error");
+          return;
+        }
+
+        setStatus("Deleted " + data.domain, "ok");
+        await loadDomains();
+      }
+
       addBtn.addEventListener("click", () => {
         addDomain().catch(() => setStatus("Failed to add domain", "error"));
       });
@@ -419,6 +493,20 @@ function buildUiHtml() {
 
       showBtn.addEventListener("click", () => {
         loadDomains().catch(() => setStatus("Failed to load allowlist", "error"));
+      });
+
+      list.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+          return;
+        }
+
+        if (target.classList.contains("delete-btn")) {
+          const domain = target.getAttribute("data-domain");
+          if (domain) {
+            deleteDomain(domain).catch(() => setStatus("Failed to delete domain", "error"));
+          }
+        }
       });
 
       copyUrlBtn.addEventListener("click", async () => {
